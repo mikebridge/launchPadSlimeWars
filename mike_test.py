@@ -80,11 +80,20 @@ class SlimeWarsStrategyTests(unittest.TestCase):
         
     def test_init_puts_users_in_corners(self):
         squares = self.strategy.initBoardSetup()
-        #print(squares)
-        #print[square for square in squares]
         expectedSquare = Square(0,0,RED)
         self.assertTrue(expectedSquare in squares)
         
+    def test_captures_returns_opponents(self):
+        color1 = ButtonColor(1,1)
+        color2 = ButtonColor(2,2)
+        self.virtualBoard.setColor(3,3,color1)
+        squares = self.strategy.captures(3,2,color2)
+        print[str(square) + '\n' for square in squares]
+        expectedSquare = Square(3,3,color2)
+        self.assertTrue(expectedSquare in squares)
+
+        self.assertEqual(len(squares), 1)
+
         
         
 if __name__ == '__main__':
