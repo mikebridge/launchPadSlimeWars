@@ -31,8 +31,8 @@ class VirtualBoard:
     # but the launchpad is indexed from 1 vertically because of
     # the extra horizontal row at the top.
     
-    maxx = 8
-    maxy = 8
+    maxx = 4
+    maxy = 4
     
     def __init__(self):
         self.matrix = [[ButtonColor(0,0)
@@ -42,14 +42,14 @@ class VirtualBoard:
 
     
     def setColor(self, x, y, buttonColor):
-        if self.matrix[x][y].red == 0 and self.matrix[x][y].green == 0:
+        if self.matrix[x][y].red == 0 and \
+           self.matrix[x][y].green == 0 and \
+           not (buttonColor.red == 0 and \
+               buttonColor.green == 0):
+            print("ON EMPTY "+str(x)+","+str(y))
             self.emptySquares -= 1
-        if buttonColor.red != 0 and buttonColor.green != 0:
-            self.emptySquares += 1
 
-        self.matrix[x][y] = buttonColor
-            
-        #LP.LedCtrlXY(x, y + 1, buttonColor.red, buttonColor.green)
+        self.matrix[x][y] = buttonColor        
     
     def cycleColor(self, x, y):
         self.setColor(x, y, self.matrix[x][y].nextColor())
@@ -59,6 +59,12 @@ class VirtualBoard:
 
     def currentColor(self, x, y):
         return self.matrix[x][y]
+
+    def squaresWithColor(self, buttonColor):
+        return [Square(x,y,buttonColor)
+                    for x in range(0, self.maxx)
+                    for y in range(0, self.maxy)
+                    if buttonColor == self.matrix[x][y]]
 
 class HWBoard:
     
@@ -154,8 +160,7 @@ class SlimeWarsStrategy:
 
     def fillInitCorner(self, x, y, playerColor):
         moves = []
-        moves.append(Square(x, y, playerColor))
-        #moves.append(Square(x, y, playerColor)                     
+        moves.append(Square(x, y, playerColor))                     
         return moves
                      
     def initBoardSetup(self):
@@ -173,6 +178,22 @@ class SlimeWarsStrategy:
         return self.boardLogic.squareIsColor(requestedx, requestedy, self.emptyColor) \
                and self.boardLogic.hasAdjacentColor(requestedx, requestedy, self.playerColorList[player])
 
+    def hasAValidMove(self, player):
+        playerColor = self.playerColorList[player]
+        print("player ",player," has ", str(len(self.board.squaresWithColor(playerColor))))
+        print("empty has ", str(len(self.board.squaresWithColor(self.emptyColor))))
+        for playerSquare in self.board.squaresWithColor(playerColor):
+            
+            for emptySquare in self.board.squaresWithColor(self.emptyColor):
+                if (abs(emptySquare.x - playerSquare.x) < 2 and \
+                    abs(emptySquare.y - playerSquare.y) < 2):
+                    print(str(player) + "can move from "+str(playerSquare.x) +"," +str(playerSquare.y) +" to " + str(emptySquare.x) +"," +str(emptySquare.y))
+                    return True
+        print("NO MOVE for player " + str(player))
+        return False
+                    
+        
+
     def captures(self, requestedx, requestedy, playerColor):
         return [Square(square.x, square.y, playerColor)        
                 for square in
@@ -189,6 +210,7 @@ class SlimeWarsStrategy:
         return result
     
     def isComplete(self):
+        print("empty" + str(self.board.emptySquares))
         return self.board.emptySquares == 0
 
 def main():
@@ -199,7 +221,7 @@ def main():
     YELLOW = ButtonColor(1,2)
     ORANGE = ButtonColor(3,3)
     playerColor = [RED, GREEN, YELLOW, ORANGE]
-
+    playerCount = len(playerColor)
     LP = launchpad.Launchpad()  # creates a Launchpad instance (first Launchpad found)
     print("Opening Launchpad...")
      
@@ -229,19 +251,25 @@ def main():
                 continue
             
             if buttonxy[2] == True: # True == push down
-                moves = game.calculateBoardUpdates(currentPlayer, buttonxy[0], buttonxy[1] - 1)
-                if len(moves)> 0:
-                    currentPlayer = (currentPlayer + 1) % len(playerColor)
-                    
-                    topRow.setAllToColor(playerColor[currentPlayer])                    
+                moves = game.calculateBoardUpdates(currentPlayer, buttonxy[0], buttonxy[1] - 1)                                
                 [boardMover.apply(move) for move in moves]
+                
+                if len(moves)> 0:                    
+                    lookForNextPlayer = not(game.isComplete())
+                    while lookForNextPlayer:
+                        currentPlayer = (currentPlayer + 1) % playerCount
+                        lookForNextPlayer = not(game.hasAValidMove(currentPlayer))
+                    
+                    topRow.setAllToColor(playerColor[currentPlayer]) 
+                
                 if game.isComplete():
+                    #todo: make this flash with the winner's color
                     topRow.flashAllWithColor(playerColor[currentPlayer])
                     break;
 
     print("DONE")
 
-    LP.Reset()
+    #LP.Reset()
     LP.Close()
             
 #	LP.LedCtrlString( 'HELLO   ', 0, 3, -1 )  # scroll "HELLO" from right to left
