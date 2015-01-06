@@ -42,15 +42,14 @@ class VirtualBoard:
                         for j in range(self.maxy)]
         self.emptySquares = self.maxx * self.maxy
 
+    def updateEmptySquareCount(self, x, y, buttonColor):
+        if (buttonColor != ButtonColor(0,0) and self.matrix[x][y] == ButtonColor(0,0)):
+            self.emptySquares -= 1
+        if (buttonColor == ButtonColor(0,0) and self.matrix[x][y] != ButtonColor(0,0)):
+            self.emptySquares += 1            
     
     def setColor(self, x, y, buttonColor):
-        if self.matrix[x][y].red == 0 and \
-           self.matrix[x][y].green == 0 and \
-           not (buttonColor.red == 0 and \
-               buttonColor.green == 0):
-#            print("ON EMPTY "+str(x)+","+str(y))
-            self.emptySquares -= 1
-
+        self.updateEmptySquareCount(x, y, buttonColor)
         self.matrix[x][y] = buttonColor        
     
     def cycleColor(self, x, y):
@@ -77,8 +76,7 @@ class VirtualBoard:
     def colorsThatHaveMaxCount(self):
         colorCounts = self.colorsWithCounts()
         return [k for k,v in colorCounts.iteritems()
-                if v == max(colorCounts.values())]
-    
+                if v == max(colorCounts.values())]        
 
 class HWBoard:
     
@@ -90,6 +88,18 @@ class HWBoard:
         #self.matrix[x][y] = buttonColor
         self.virtualBoard.setColor(x, y, buttonColor)
         self.LP.LedCtrlXY(x, y + 1, buttonColor.red, buttonColor.green)
+
+    def flashWithColor(self, x, y, offColor, finalColor):
+        self.virtualBoard.setColor(x, y, finalColor)
+        ms = 100
+        for i in range(1,4):
+            time.wait(ms)
+            self.LP.LedCtrlXY(x, y + 1, finalColor.red, finalColor.green)
+            time.wait(ms)
+            self.LP.LedCtrlXY(x, y + 1, offColor.red, offColor.green)
+        time.wait(ms)
+        self.LP.LedCtrlXY(x, y + 1, finalColor.red, finalColor.green)
+
         
     def __getattr__(self,name):
         return getattr(self.virtualBoard, name)
@@ -129,15 +139,28 @@ class BoardLogic:
             and x < self.board.maxx and y < self.board.maxy)
 
     def squaresAdjacentTo(self, x, y):
+        return self.squaresWithinSpaces(x,y,1)
+#        return [Square(x1, y1, self.board.currentColor(x1, y1))
+                #for x1 in range(x - 1, x + 2)
+                #for y1 in range(y - 1, y + 2)
+                #if(not(x1 == x and y1 == y)
+                     #and self.inBounds(x1, y1))]                    
+
+    def squaresWithinSpaces(self, x, y, distance):
         return [Square(x1, y1, self.board.currentColor(x1, y1))
-                for x1 in range(x - 1, x + 2)
-                for y1 in range(y - 1, y + 2)
+                for x1 in range(x - distance, x + distance + 1)
+                for y1 in range(y - distance, y + distance + 1)
                 if(not(x1 == x and y1 == y)
                      and self.inBounds(x1, y1))]                    
             
     def hasAdjacentColor(self, x, y, color):
         return [square
                 for square in self.squaresAdjacentTo(x, y)
+                if square.color == color]
+
+    def hasColorWithinDistance(self, x, y, color, distance):
+        return [square
+                for square in self.squaresWithinSpaces(x, y, distance)
                 if square.color == color]
 
     def squareIsColor(self, x, y, color):
@@ -189,22 +212,29 @@ class SlimeWarsStrategy:
             moves += self.fillInitCorner(0, maxy, self.playerColorList[3])
         return moves
 
-    def isValidMove(self, player, requestedx, requestedy):
-        return self.boardLogic.squareIsColor(requestedx, requestedy, self.emptyColor) \
-               and self.boardLogic.hasAdjacentColor(requestedx, requestedy, self.playerColorList[player])
+    def distance(self, x1, y1, x2, y2):
+        return max(abs(x1 - x2), abs(y1 - y2))        
+
+    def isValidMove(self, player, requestedx, requestedy, preselectedxy):
+        if not(self.boardLogic.squareIsColor(requestedx, requestedy, self.emptyColor)):
+            return False
+        
+        if (preselectedxy == None):        
+            return self.boardLogic.hasAdjacentColor(requestedx, requestedy, \
+                                                          self.playerColorList[player])
+        else:
+            print(self.boardLogic.squareIsColor(preselectedxy[0], preselectedxy[1], self.playerColorList[player]))
+            return self.boardLogic.squareIsColor(preselectedxy[0], preselectedxy[1], self.playerColorList[player])\
+                and self.distance(requestedx, requestedy, preselectedxy[0], preselectedxy[1]) < 3
+        
 
     def hasAValidMove(self, player):
         playerColor = self.playerColorList[player]
-        #print("player ",player," has ", str(len(self.board.squaresWithColor(playerColor))))
-        #print("empty has ", str(len(self.board.squaresWithColor(self.emptyColor))))
         for playerSquare in self.board.squaresWithColor(playerColor):
-            
             for emptySquare in self.board.squaresWithColor(self.emptyColor):
-                if (abs(emptySquare.x - playerSquare.x) < 2 and \
-                    abs(emptySquare.y - playerSquare.y) < 2):
-                    #print(str(player) + "can move from "+str(playerSquare.x) +"," +str(playerSquare.y) +" to " + str(emptySquare.x) +"," +str(emptySquare.y))
+                if (abs(emptySquare.x - playerSquare.x) < 3 and \
+                    abs(emptySquare.y - playerSquare.y) < 3):
                     return True
-        #print("NO MOVE for player " + str(player))
         return False
 
 
@@ -215,16 +245,19 @@ class SlimeWarsStrategy:
                 if not(square.color.red == 0 and square.color.green == 0) and\
                     square.color != playerColor]
         
-    def calculateBoardUpdates(self, player, requestedx, requestedy):
+    def calculateBoardUpdates(self, player, requestedx, requestedy, preselectedxy=None):
         result = []
         currentColor = self.playerColorList[player]        
-        if(self.isValidMove(player, requestedx, requestedy)):
+        if(self.isValidMove(player, requestedx, requestedy, preselectedxy)):
             result = [Square(requestedx,requestedy, currentColor)] +\
                 self.captures(requestedx, requestedy, currentColor)
+            if preselectedxy!=None and self.distance(requestedx, requestedy,
+                                                     preselectedxy[0], preselectedxy[1]) == 2:
+                result.append(Square(preselectedxy[0], preselectedxy[1], self.emptyColor))
         return result
     
     def isComplete(self):
-        print("empty" + str(self.board.emptySquares))
+        #print("empty" + str(self.board.emptySquares))
         return self.board.emptySquares == 0
 
 def main():
@@ -252,10 +285,12 @@ def main():
     currentPlayer = 0
     topRow.setAllToColor(playerColor[currentPlayer])
     print("READY!")
-    
+
+    preselectedButton = None    
     while True:
         time.wait(30)
         buttonxy = LP.ButtonStateXY()
+
         if buttonxy != []:
             #print(buttonxy)
             if buttonxy == [ 8, 8, True ]: # Lower right btn
@@ -265,10 +300,22 @@ def main():
                 continue
             
             if buttonxy[2] == True: # True == push down
-                moves = game.calculateBoardUpdates(currentPlayer, buttonxy[0], buttonxy[1] - 1)                                
+                # set a start button (optional)
+                if board.currentColor(buttonxy[0], buttonxy[1] - 1) == playerColor[currentPlayer]:
+                    preselectedButton = (buttonxy[0], buttonxy[1] - 1)
+                    board.flashWithColor(buttonxy[0],
+                                         buttonxy[1] - 1,
+                                         ButtonColor(0,0),
+                                         playerColor[currentPlayer])
+                    print("set preselected "+str(preselectedButton))
+                    continue
+
+                print("using preselected "+str(preselectedButton))            
+                moves = game.calculateBoardUpdates(currentPlayer, buttonxy[0], buttonxy[1] - 1, preselectedButton) 
                 [boardMover.apply(move) for move in moves]
                 
-                if len(moves)> 0:                    
+                if len(moves)> 0:
+                    preselectedButton = None
                     lookForNextPlayer = not(game.isComplete())
                     while lookForNextPlayer:
                         currentPlayer = (currentPlayer + 1) % playerCount
