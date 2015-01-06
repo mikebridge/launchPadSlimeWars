@@ -30,6 +30,40 @@ class SquareTests(unittest.TestCase):
         self.assertNotEqual(Square(3,3, self.color1), Square(3,2, self.color1))
 
 
+class VirtualBoardTests(unittest.TestCase):
+    color0 = ButtonColor(0,0)
+    color1 = ButtonColor(1,1)
+    color2 = ButtonColor(2,1)
+
+    def setUp(self):
+        self.virtualBoard = VirtualBoard()
+
+    def test_colorsWithCountsReturnsTotals(self):
+        self.virtualBoard.setColor(1,1, self.color1)
+        self.virtualBoard.setColor(2,2, self.color2)
+        self.virtualBoard.setColor(2,3, self.color2)
+        totals = self.virtualBoard.colorsWithCounts()
+    
+        self.assertEqual(totals[self.color1], 1)
+        self.assertEqual(totals[self.color2], 2)
+        self.assertEqual(totals[self.color0], 61)
+
+    def test_colorsWithCountsReturnsTotals(self):
+        self.virtualBoard.setColor(1,1, self.color1)
+        self.virtualBoard.setColor(2,2, self.color2)
+        self.virtualBoard.setColor(2,3, self.color2)
+        winners = self.virtualBoard.colorsThatHaveMaxCount()
+        self.assertEqual(winners, [self.color0])
+
+    def test_colorsWithCountsReturnsMultipleColors(self):
+        for i in range(self.virtualBoard.maxx/2):
+            for j in range(self.virtualBoard.maxy):
+                self.virtualBoard.setColor(i,j, self.color1)
+        winners = self.virtualBoard.colorsThatHaveMaxCount()
+        self.assertListEqual(winners, [self.color0,self.color1])
+
+
+    
 class BoardLogicTests(unittest.TestCase):
 
     def setUp(self):
@@ -88,7 +122,7 @@ class SlimeWarsStrategyTests(unittest.TestCase):
         color2 = ButtonColor(2,2)
         self.virtualBoard.setColor(3,3,color1)
         squares = self.strategy.captures(3,2,color2)
-        print[str(square) + '\n' for square in squares]
+        #print[str(square) + '\n' for square in squares]
         expectedSquare = Square(3,3,color2)
         self.assertTrue(expectedSquare in squares)
 

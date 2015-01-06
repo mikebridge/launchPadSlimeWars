@@ -26,15 +26,17 @@ class ButtonColor:
     def __str__(self):
         return "RED("+str(self.red)+"), GREEN("+str(self.green)+")"
 
+    def __hash__(self):
+        return hash((self.red, self.green))
+
 class VirtualBoard:
-    # logically, the board is 8 x 8, indexed from zero.
+    # logically, the board is maxx x maxy, indexed from zero.
     # but the launchpad is indexed from 1 vertically because of
     # the extra horizontal row at the top.
     
-    maxx = 4
-    maxy = 4
-    
-    def __init__(self):
+    def __init__(self, maxx = 8, maxy = 8):
+        self.maxx = maxx
+        self.maxy = maxy
         self.matrix = [[ButtonColor(0,0)
                         for i in range(self.maxx)]
                         for j in range(self.maxy)]
@@ -46,7 +48,7 @@ class VirtualBoard:
            self.matrix[x][y].green == 0 and \
            not (buttonColor.red == 0 and \
                buttonColor.green == 0):
-            print("ON EMPTY "+str(x)+","+str(y))
+#            print("ON EMPTY "+str(x)+","+str(y))
             self.emptySquares -= 1
 
         self.matrix[x][y] = buttonColor        
@@ -65,6 +67,18 @@ class VirtualBoard:
                     for x in range(0, self.maxx)
                     for y in range(0, self.maxy)
                     if buttonColor == self.matrix[x][y]]
+                        
+    def colorsWithCounts(self):
+        colors = [self.matrix[x][y]
+            for x in range(0, self.maxx)
+            for y in range(0, self.maxy)]
+        return {color: colors.count(color) for color in colors}
+
+    def colorsThatHaveMaxCount(self):
+        colorCounts = self.colorsWithCounts()
+        return [k for k,v in colorCounts.iteritems()
+                if v == max(colorCounts.values())]
+    
 
 class HWBoard:
     
@@ -88,12 +102,13 @@ class HWTopRow:
         for x in range(0,8):
             self.LP.LedCtrlXY(x, 0, buttonColor.red, buttonColor.green)
 
-    def flashAllWithColor(self, buttonColor):
+    def flashAllWithColor(self, buttonColors):
         for i in range(1,5):
-            time.wait(1000)
-            self.setAllToColor(ButtonColor(0,0))
-            time.wait(1000)
-            self.setAllToColor(buttonColor)            
+            for color in buttonColors:
+                time.wait(1000)
+                self.setAllToColor(ButtonColor(0,0))
+                time.wait(1000)
+                self.setAllToColor(color)            
 
 class HWSideColumn:
     def __init__(self, LP):
@@ -180,19 +195,18 @@ class SlimeWarsStrategy:
 
     def hasAValidMove(self, player):
         playerColor = self.playerColorList[player]
-        print("player ",player," has ", str(len(self.board.squaresWithColor(playerColor))))
-        print("empty has ", str(len(self.board.squaresWithColor(self.emptyColor))))
+        #print("player ",player," has ", str(len(self.board.squaresWithColor(playerColor))))
+        #print("empty has ", str(len(self.board.squaresWithColor(self.emptyColor))))
         for playerSquare in self.board.squaresWithColor(playerColor):
             
             for emptySquare in self.board.squaresWithColor(self.emptyColor):
                 if (abs(emptySquare.x - playerSquare.x) < 2 and \
                     abs(emptySquare.y - playerSquare.y) < 2):
-                    print(str(player) + "can move from "+str(playerSquare.x) +"," +str(playerSquare.y) +" to " + str(emptySquare.x) +"," +str(emptySquare.y))
+                    #print(str(player) + "can move from "+str(playerSquare.x) +"," +str(playerSquare.y) +" to " + str(emptySquare.x) +"," +str(emptySquare.y))
                     return True
-        print("NO MOVE for player " + str(player))
+        #print("NO MOVE for player " + str(player))
         return False
-                    
-        
+
 
     def captures(self, requestedx, requestedy, playerColor):
         return [Square(square.x, square.y, playerColor)        
@@ -227,7 +241,7 @@ def main():
      
     LP.Open()                   # start it
     LP.Reset()
-    virtualBoard = VirtualBoard()
+    virtualBoard = VirtualBoard(maxx=4, maxy=4)
     board = HWBoard(virtualBoard, LP);
     topRow = HWTopRow(LP);
     
@@ -264,8 +278,12 @@ def main():
                 
                 if game.isComplete():
                     #todo: make this flash with the winner's color
-                    topRow.flashAllWithColor(playerColor[currentPlayer])
+                    winnerColors = board.colorsThatHaveMaxCount()
+                    topRow.flashAllWithColor(winnerColors)
                     break;
+
+    
+    
 
     print("DONE")
 
