@@ -140,11 +140,6 @@ class BoardLogic:
 
     def squaresAdjacentTo(self, x, y):
         return self.squaresWithinSpaces(x,y,1)
-#        return [Square(x1, y1, self.board.currentColor(x1, y1))
-                #for x1 in range(x - 1, x + 2)
-                #for y1 in range(y - 1, y + 2)
-                #if(not(x1 == x and y1 == y)
-                     #and self.inBounds(x1, y1))]                    
 
     def squaresWithinSpaces(self, x, y, distance):
         return [Square(x1, y1, self.board.currentColor(x1, y1))
@@ -198,7 +193,9 @@ class SlimeWarsStrategy:
 
     def fillInitCorner(self, x, y, playerColor):
         moves = []
-        moves.append(Square(x, y, playerColor))                     
+        moves.append(Square(x, y, playerColor))
+        moves.append(Square(x, 1 if y==0 else self.board.maxy - 2, playerColor))
+        moves.append(Square(1 if x==0 else self.board.maxx - 2, y, playerColor))
         return moves
                      
     def initBoardSetup(self):
@@ -222,8 +219,7 @@ class SlimeWarsStrategy:
         if (preselectedxy == None):        
             return self.boardLogic.hasAdjacentColor(requestedx, requestedy, \
                                                           self.playerColorList[player])
-        else:
-            print(self.boardLogic.squareIsColor(preselectedxy[0], preselectedxy[1], self.playerColorList[player]))
+        else:            
             return self.boardLogic.squareIsColor(preselectedxy[0], preselectedxy[1], self.playerColorList[player])\
                 and self.distance(requestedx, requestedy, preselectedxy[0], preselectedxy[1]) < 3
         
@@ -257,7 +253,6 @@ class SlimeWarsStrategy:
         return result
     
     def isComplete(self):
-        #print("empty" + str(self.board.emptySquares))
         return self.board.emptySquares == 0
 
 def main():
@@ -274,7 +269,7 @@ def main():
      
     LP.Open()                   # start it
     LP.Reset()
-    virtualBoard = VirtualBoard(maxx=4, maxy=4)
+    virtualBoard = VirtualBoard(maxx=6, maxy=6)
     board = HWBoard(virtualBoard, LP);
     topRow = HWTopRow(LP);
     
@@ -298,6 +293,9 @@ def main():
             
             if buttonxy[0] == 8 or buttonxy[1] == 0:   # ignore the side rows
                 continue
+
+            if buttonxy[0] >= board.maxx or buttonxy[1] > board.maxy:   # ignore the unused rows
+                continue
             
             if buttonxy[2] == True: # True == push down
                 # set a start button (optional)
@@ -307,10 +305,9 @@ def main():
                                          buttonxy[1] - 1,
                                          ButtonColor(0,0),
                                          playerColor[currentPlayer])
-                    print("set preselected "+str(preselectedButton))
                     continue
 
-                print("using preselected "+str(preselectedButton))            
+                #print("using preselected "+str(preselectedButton))            
                 moves = game.calculateBoardUpdates(currentPlayer, buttonxy[0], buttonxy[1] - 1, preselectedButton) 
                 [boardMover.apply(move) for move in moves]
                 
